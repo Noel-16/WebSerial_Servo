@@ -1,0 +1,121 @@
+<!DOCTYPE html>
+<html>
+    <head><h1>Web Serial Servo Controller</h1></head>
+    <style>
+        body{
+            font-family:'Franklin Gothic Medium', 'Arial Narrow', Arial, sans-serif;
+            background-color: rgb(103, 197, 197);
+            display: flex;
+            flex-direction:column;
+            justify-content: center;
+            align-items:center;
+            height:100vh;
+            margin:0;
+
+        } 
+        button {
+            padding: 10px 20px;
+            margin:10px;
+            background-color:green;
+            color: white;
+            border-radius: 5px;
+            cursor:pointer;
+        }
+
+        .textarea{
+            margin:auto;
+        }
+
+    </style>
+
+    <body>
+        <div>
+            <button id="ConnBn">Connect</button>
+        </div>
+        <div style="margin-auto">  <!-- Required for proper alignment of visual elements-->
+            <textarea id="SerialOut" style="margin-auto;" rows="10" cols ="30" disabled></textarea> <!-- Serial Monitor where we can read and write data-->    
+        </div>
+        <div>
+            <input type="range" min="0" max="180" value="0" id="Slider">
+            <span id="aDisplay" style = "background-color: #e0e0e0;">000</span>
+        </div>
+    
+        <script>
+            const connectBtn = document.getElementById('ConnBn');
+            const dataSlider = document.getElementById('Slider');
+            const angleDisplay = document.getElementById('aDisplay');  
+            
+            // angleDisplay.addListenerEvent('input',sendAngle);
+    
+            let port
+            let writer
+            let reader
+            let toggleConnect = false
+    
+            connectBtn.addEventListener('click',connectToSerial);
+            dataSlider.addEventListener('input',sendAngle);
+                
+            async function connectToSerial(){
+                if (!toggleConnect){
+                    try{
+                        port = await navigator.serial.requestPort()
+                        await port.open({baudRate:9600});
+                        writer = port.writable.getWriter();
+                        reader = port.readable.getReader();  
+                        sendData();
+                        connectBtn.style.backgroundColor = "red";
+                        connectBtn.textContent = "Disconnect";
+                        toggleConnect=!toggleConnect
+                        //Send message to Serial Monitor saying connection successful.
+                    }
+                    catch(error){
+                        console.error("Error, unable to open serial port", error);
+                    }
+                }
+                else{
+                    try{
+                        await writer.releaseLock();
+                        await reader.releaseLock();
+                        await port.close();
+                        //remove reference as a fail safe
+                        writer=null;
+                        reader=null;
+                        port=null;
+                        connectBtn.style.backgroundColor = "green";
+                        connectBtn.textContent = "Connect";
+                        toggleConnect=!toggleConnect;
+                        //Send message to Serial Monitor saying disconnection successful.
+                    }
+                    catch(error){
+                        console.error("Error, unable to close serial port", error);
+                    }   
+                }
+                
+            }
+        
+            async function sendAngle(){
+                sendData(dataSlider.value)
+                angleDisplay.textContent=dataSlider.value.padStart(3,"0");
+            }
+        
+            function sendData(value = dataSlider.value){
+                const encoder = new TextEncoder();
+                if (!writer) return;
+                
+                value = value.toString().padStart(3,"0");
+                writer
+                    .write(encoder.encode(value))
+                    .then (()=>{
+                        console.log("Sent: " + value);
+                        document.getElementById('SerialOut').scrollTop= document.getElementById('SerialOut').scrollHeight;
+                    });
+                    const end = '\n'
+                    writer.write(encoder.encode(end));
+                    document.getElementById('SerialOut').textContent+="Servo 1 Angle: " + value + '\n';
+                }
+        
+        </script>    
+    </body>
+    
+
+</html>
